@@ -6,7 +6,6 @@
 # Needs cron to include TERM=xterm
 # 20181202 updated for webinoly because 'site -list' returns " - " before each site
 # 20181212 removed existing site list mechanism and used Webinoly's own site code, other minor tweaks
-
 #define local path for backups
 BACKUPPATH="/path/to/gdrive-backup-tmp/folder"
 
