@@ -1,6 +1,9 @@
 #!/bin/bash
-# Based on script by Mike from: https://guides.wp-bullet.com
-# 20181202 updated for webinoly to handle output from 'site -list' command
+# Source: https://guides.wp-bullet.com
+# Author: Mike
+# heavily updated to work with Webinoly
+# 20181202 updated for webinoly because 'site -list' returns " - " before each site
+# 20181212 removed existing site list mechanism and used Webinoly's own site code, other minor tweaks
 
 #define local path for backups
 BACKUPPATH="/path/to/gdrive-backup-tmp/folder"
@@ -23,20 +26,26 @@ DAYSKEPT=$(date +"%Y-%m-%d" -d "-$DAYSKEEP days")
 #create array of sites based on folder names
 echo Generating site list
 
-# webinoly site -list command returns lines that start with hyphens and spaces, along with control chars, which need to be removed
-# SED s/[\x01-\x1F\x7F]//g removes control characters
-# SED s/.{7}// removes first seven chars and s/.{5}$// removes last 5 chars
-# SED /^\s*$/d removes blank lines
-# removing characters http://www.theunixschool.com/2014/08/sed-examples-remove-delete-chars-from-line-file.html
-# removing empty lines https://stackoverflow.com/questions/16414410/delete-empty-lines-using-sed
-SITELIST=($(/usr/bin/site -list | sed -r "s/[\x01-\x1F\x7F]//g;s/.{7}//;s/.{5}$//;/^\s*$/d"))
+# Site list taken from Webinoly Site Manager Plugin (Create, delete and de/activate) at /usr/bin/site
+# webinoly must be installed
+source /opt/webinoly/lib/sites
+
+# Generate array of sites (using part of List Sites command in webinoly)
+	for site in "/etc/nginx/sites-available"/*
+	do
+		domi=$(echo $site | cut -f 5 -d "/")
+		[[ -a /var/www/$domi ]] && sign="${gre} -" || sign="${blu} *${gre}"
+		[[ $domi != "default" && $domi != $(conf_read tools-port) ]] && SITELIST+="$domi "
+	done
+
 #print site list
 echo Site list
-echo ---
+echo ----------
 for SITE in ${SITELIST[@]}; do
 echo "$SITE"
 done
-echo ---
+echo ----------
+
 #make sure the backup folder exists
 mkdir -p $BACKUPPATH
 
@@ -51,12 +60,11 @@ BACKUPSID=$(gdrive list --no-header | grep $BACKUPPATHREM | grep dir | awk '{ pr
 echo Starting
 for SITE in ${SITELIST[@]}; do
     echo ----------
-    echo Working on $SITE
     #delete old backup, get folder id and delete if exists
     OLDBACKUP=$(gdrive list --no-header | grep $DAYSKEPT-$SITE | grep dir | awk '{ print $1}')
     if [ ! -z "$OLDBACKUP" ]; then
         gdrive delete $OLDBACKUP
-    fi
+    fi 
 
     # create the local backup folder if it doesn't exist
     if [ ! -e $BACKUPPATH/$SITE ]; then
@@ -64,10 +72,11 @@ for SITE in ${SITELIST[@]}; do
     fi
 
     #enter the WordPress folder
-    #added "htdocs" per ee structure
+    #added "htdocs" per ee/webinoly structure
     cd $SITESTORE/$SITE/htdocs
-
+  
     #back up the WordPress folder
+    echo Compressing $SITE
     #tar -czf $BACKUPPATH/$SITENAME/$SITE/$DATEFORM-$SITE.tar.gz .
     zip -r --quiet $BACKUPPATH/$SITENAME/$SITE/$DATEFORM-$SITE.zip .
     #back up the WordPress database, compress and clean up
@@ -75,7 +84,7 @@ for SITE in ${SITELIST[@]}; do
     #cat $BACKUPPATH/$SITE/$DATEFORM-$SITE.sql | gzip > $BACKUPPATH/$SITE/$DATEFORM-$SITE.sql.gz
     cat $BACKUPPATH/$SITE/$DATEFORM-$SITE.sql | zip > $BACKUPPATH/$SITE/$DATEFORM-$SITE.sql.zip
     rm $BACKUPPATH/$SITE/$DATEFORM-$SITE.sql
-
+    
     #get current folder ID
     SITEFOLDERID=$(gdrive list --no-header | grep $SITE | grep dir | awk '{ print $1}')
 
@@ -98,3 +107,4 @@ done
 sudo chown -R www-data:www-data $SITESTORE
 sudo find $SITESTORE -type f -exec chmod 644 {} +
 sudo find $SITESTORE -type d -exec chmod 755 {} +
+
