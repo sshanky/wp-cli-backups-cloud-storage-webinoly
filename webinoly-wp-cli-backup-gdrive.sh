@@ -1,7 +1,9 @@
 #!/bin/bash
 # Source: https://guides.wp-bullet.com
 # Author: Mike
+# modified by: SS
 # heavily updated to work with Webinoly
+# Needs cron to include TERM=xterm
 # 20181202 updated for webinoly because 'site -list' returns " - " before each site
 # 20181212 removed existing site list mechanism and used Webinoly's own site code, other minor tweaks
 
@@ -64,7 +66,7 @@ for SITE in ${SITELIST[@]}; do
     OLDBACKUP=$(gdrive list --no-header | grep $DAYSKEPT-$SITE | grep dir | awk '{ print $1}')
     if [ ! -z "$OLDBACKUP" ]; then
         gdrive delete $OLDBACKUP
-    fi 
+    fi
 
     # create the local backup folder if it doesn't exist
     if [ ! -e $BACKUPPATH/$SITE ]; then
@@ -74,17 +76,17 @@ for SITE in ${SITELIST[@]}; do
     #enter the WordPress folder
     #added "htdocs" per ee/webinoly structure
     cd $SITESTORE/$SITE/htdocs
-  
+
     #back up the WordPress folder
     echo Compressing $SITE
     #tar -czf $BACKUPPATH/$SITENAME/$SITE/$DATEFORM-$SITE.tar.gz .
     zip -r --quiet $BACKUPPATH/$SITENAME/$SITE/$DATEFORM-$SITE.zip .
     #back up the WordPress database, compress and clean up
-    wp db export $BACKUPPATH/$SITE/$DATEFORM-$SITE.sql --all-tablespaces --single-transaction --quick --lock-tables=false --allow-root --skip-themes --skip-plugins
+    /usr/local/bin/wp db export $BACKUPPATH/$SITE/$DATEFORM-$SITE.sql --all-tablespaces --single-transaction --quick --lock-tables=false --allow-root --skip-themes --skip-plugins
     #cat $BACKUPPATH/$SITE/$DATEFORM-$SITE.sql | gzip > $BACKUPPATH/$SITE/$DATEFORM-$SITE.sql.gz
     cat $BACKUPPATH/$SITE/$DATEFORM-$SITE.sql | zip > $BACKUPPATH/$SITE/$DATEFORM-$SITE.sql.zip
     rm $BACKUPPATH/$SITE/$DATEFORM-$SITE.sql
-    
+
     #get current folder ID
     SITEFOLDERID=$(gdrive list --no-header | grep $SITE | grep dir | awk '{ print $1}')
 
@@ -107,4 +109,3 @@ done
 sudo chown -R www-data:www-data $SITESTORE
 sudo find $SITESTORE -type f -exec chmod 644 {} +
 sudo find $SITESTORE -type d -exec chmod 755 {} +
-
